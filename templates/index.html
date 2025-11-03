@@ -16,7 +16,7 @@
     <div id="root">
 
       <main class="fr-container app-main" id="content" role="main">
-        <h1 class="fr-h1">Envoyer un token</h1>
+        <h1 class="fr-h1">Test de modif label DS</h1>
         <p class="fr-mb-4w">La page récupère un identifiant de document depuis une table Grist et envoie ce document avec le token saisi.</p>
 
         <form id="tokenForm" class="fr-form" novalidate>
@@ -26,9 +26,11 @@
           </div>
 
           <div class="fr-form-group">
-            <label class="fr-label" for="docId">Identifiant de document (chargé depuis Grist)</label>
-            <input class="fr-input" id="docId" name="docId" type="text" readonly aria-readonly="true" />
+            <label class="fr-label" for="docId">Dossier Id</label>
+            <input class="fr-input" id="docId" name="docId" type="text" aria-readonly="true" />
           </div>
+
+        
         </br>
 
           <button class="fr-btn" type="submit">Exécuter GraphQL</button>
@@ -45,23 +47,36 @@
     <script>if (window.dsfr) window.dsfr.init();</script>
 
     <script>
-      async function updateDemarcheID(data) {
-          console.log(data.demarcheID)
-          document.getElementById('docId').value = data.demarcheID;
-      }
 
       document.getElementById('tokenForm').addEventListener('submit', async (ev) => {
         ev.preventDefault();
         const token = document.getElementById('token').value;
         const docId = document.getElementById('docId').value;
-        const payload = { token, docId };
+
+      const query = `mutation DossierAjouterLabel {
+        dossierAjouterLabel(
+          input: { dossierId: "${docId}", labelId: "TGFiZWwtNDE5OTEx" }
+          ) {
+            clientMutationId
+          }
+        }`;
+
+        const payload = {
+        token,
+        query
+      }
         document.getElementById('result').textContent = 'Envoi en cours...';
         try {
-          const res = await fetch('/create', {
+          const res = await fetch('/create',{
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json'
+            },
             body: JSON.stringify(payload)
-          });
+          } );
+          const data = await res.json();
+          console.log("Response from external API:", data);
+
           const text = await res.text();
           try {
             const j = JSON.parse(text);
@@ -75,16 +90,22 @@
       });
 
       // Load the docId on startup
-      grist.ready();
-
+      grist.ready({ requiredAccess: 'full' });
       grist.onRecord((record) => {
         console.log("Received record:", record);
-        if (record?.demarcheID) {
-            updateDemarcheID(record);
-        } else {
-            console.warn("Missing Demarche Id");
-        }
+      //   if (record?.demarcheID) {
+      //       updateDemarcheID(record);
+      //   } else {
+      //       console.warn("Missing Demarche Id");
+      //   }
       });
+      const getlabels = async()=>{
+
+        const tableData = await grist.docApi.fetchTable('LABELS');
+        console.log('labels are', tableData)
+      }
+      getlabels()
+
     </script>
   </body>
 </html>
