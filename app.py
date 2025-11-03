@@ -33,15 +33,47 @@ def create_post():
     token/docId as a JSON POST to that URL and return the proxied response. If not
     set, it simply echoes back the received payload for debugging.
     """
+
+    print("Raw body:", request.data)   # bytes
+
     payload = request.get_json(force=True, silent=True)
+    print('payload',payload)
+    
+
+
     if not payload:
         return jsonify({'error': 'Expected JSON body with token and docId.'}), 400
-    target = os.getenv('TARGET_POST_URL')
+    target = 'https://www.demarches-simplifiees.fr/api/v2/graphql'
+    # target = os.getenv('TARGET_POST_URL')
     if not target:
         return jsonify({'received': payload})
+    
+     # Standard headers for JSON payload
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    token = payload.get('token')  # safer: returns None if key missing
+    query = payload.get('query')
+
+    print('token',token)
+    print('query',query)
+    # Add Authorization header if token is provided
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     try:
-        r = requests.post(target, json=payload, timeout=10)
-        return Response(r.content, status=r.status_code, headers=dict(r.headers))
+        print("trying request")
+        r = requests.post(target,  json={"query": query}, headers=headers, timeout=10)
+       
+        print("trying request",r)
+        # return Response(r.content, status=r.status_code, headers=dict(r.headers))
+        return Response(
+            r.text,                     # decode content to string
+            status=r.status_code,
+            mimetype="application/json" # sets Content-Type header
+        )
+    
     except Exception as e:
         LOG.exception('Failed to forward POST')
         return jsonify({'error': 'Failed to forward POST', 'detail': str(e)}), 502
