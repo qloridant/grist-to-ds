@@ -34,17 +34,15 @@ def create_post():
     set, it simply echoes back the received payload for debugging.
     """
 
-    print("Raw body:", request.data)   # bytes
-
-    payload = request.get_json(force=True, silent=True)
-    print('payload',payload)
-    
-
-
-    if not payload:
-        return jsonify({'error': 'Expected JSON body with token and docId.'}), 400
+    # To hide !
+    token = "NjE4ZTFjNjgtZDE4My00YzBiLTk4NjUtYWRmYWFkMjAyMjMwO3Y1aGNQQ0E4ZXJBNVpBcnJiVzlvc1V0Qg=="
     target = 'https://www.demarches-simplifiees.fr/api/v2/graphql'
     # target = os.getenv('TARGET_POST_URL')
+
+    payload = request.get_json(force=True, silent=True)
+
+    if not payload:
+        return jsonify({'error': 'Expected JSON body with docId and query'}), 400
     if not target:
         return jsonify({'received': payload})
     
@@ -53,20 +51,14 @@ def create_post():
         "Content-Type": "application/json"
     }
 
-    token = payload.get('token')  # safer: returns None if key missing
     query = payload.get('query')
 
-    print('token',token)
-    print('query',query)
     # Add Authorization header if token is provided
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
     try:
-        print("trying request")
         r = requests.post(target,  json={"query": query}, headers=headers, timeout=10)
-       
-        print("trying request",r)
         # return Response(r.content, status=r.status_code, headers=dict(r.headers))
         return Response(
             r.text,                     # decode content to string
