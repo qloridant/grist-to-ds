@@ -81,8 +81,11 @@
     <script>
       grist.ready({ requiredAccess: "full" });
 
-      const labelTable = "LABELS";
-      const dossiersTableName = "Demarche_128651_dossiers";
+      const labelTable = "{{ LABEL_TABLE }}";
+      const dossiersTableName = "{{ DOSSIERS_TABLE }}";
+
+      console.log("Label table:", labelTable);
+      console.log("Dossier table:", dossiersTableName);
 
       // --- SOFT LOCK VARIABLES ---
       let isUpdating = false; // active during button operation
