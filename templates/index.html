@@ -1,111 +1,331 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Envoyer un token</title>
-    <!-- DSFR CSS (CDN). Adjust version if you want a pinned release. -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.0/dist/dsfr.min.css" />
+    <title>Modification de labels Grist -> DS</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.0/dist/dsfr.min.css"
+    />
     <style>
-      /* Light container width override to keep the page compact */
-      .app-main { max-width: 720px; margin: 1.5rem auto; }
-      pre { background:#f6f6f6; padding:12px; overflow:auto; }
+      body {
+        font-family: "Marianne", Arial, sans-serif;
+        padding: 1rem;
+      }
+      .label-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+      .spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 3rem;
+        width: 3rem;
+        margin: 2rem auto;
+      }
+      .spinner::after {
+        content: "";
+        width: 2.5rem;
+        height: 2.5rem;
+        border: 3px solid #ccc;
+        border-top-color: #000091;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
     </style>
   </head>
   <body class="fr">
-    <div id="root">
+    <h3 class="fr-h5">
+      Appliquer le label au dossier <span id="idDossier"></span> dans Démarches
+      Simplifiées
+    </h3>
+    <div id="labelContainer" class="label-buttons"></div>
+    <div id="spinner-zone"></div>
+    <div
+      id="error-message"
+      style="
+        display: none;
+        padding: 10px 15px;
+        margin-top: 10px;
+        border: 1px solid #ba2b1e;
+        background-color: #ffd8d2;
+        color: #d0270a;
+        border-radius: 4px;
+        font-size: 0.95rem;
+      "
+    ></div>
+    <div
+      id="success-message"
+      style="
+        display: none;
+        padding: 10px 15px;
+        margin-top: 10px;
+        border: 1px solid #27ae60;
+        background-color: #e9f9ef;
+        color: #1e7e34;
+        border-radius: 4px;
+        font-size: 0.95rem;
+      "
+    ></div>
 
-      <main class="fr-container app-main" id="content" role="main">
-        <h1 class="fr-h1">Test de modif label DS</h1>
-        <p class="fr-mb-4w">La page récupère un identifiant de document depuis une table Grist et envoie ce document avec le token saisi.</p>
-
-        <form id="tokenForm" class="fr-form" novalidate>
-          <div class="fr-form-group">
-            <label class="fr-label" for="token">Token</label>
-            <input class="fr-input" id="token" name="token" type="text" placeholder="Entrez le token" required aria-required="true" />
-          </div>
-
-          <div class="fr-form-group">
-            <label class="fr-label" for="docId">Dossier Id</label>
-            <input class="fr-input" id="docId" name="docId" type="text" aria-readonly="true" />
-          </div>
-
-        
-        </br>
-
-          <button class="fr-btn" type="submit">Exécuter GraphQL</button>
-        </form>
-
-        <h2 class="fr-h3 fr-mt-4w">Résultat</h2>
-        <pre id="result">(aucune activité)</pre>
-      </main>
-    </div>
-
-    <!-- DSFR JS (CDN) and initialization -->
-    <script src="https://cdn.jsdelivr.net/npm/@gouvfr/dsfr@1.13.0/dist/dsfr.umd.min.js"></script>
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
-    <script>if (window.dsfr) window.dsfr.init();</script>
-
     <script>
+      grist.ready({ requiredAccess: "full" });
 
-      document.getElementById('tokenForm').addEventListener('submit', async (ev) => {
-        ev.preventDefault();
-        const token = document.getElementById('token').value;
-        const docId = document.getElementById('docId').value;
+      const labelTable = "{{ LABEL_TABLE }}";
+      const dossiersTableName = "{{ DOSSIERS_TABLE }}";
 
-      const query = `mutation DossierAjouterLabel {
-        dossierAjouterLabel(
-          input: { dossierId: "${docId}", labelId: "TGFiZWwtNDE5OTEx" }
-          ) {
-            clientMutationId
-          }
-        }`;
+      console.log("Label table:", labelTable);
+      console.log("Dossier table:", dossiersTableName);
 
-        const payload = {
-        token,
-        query
-      }
-        document.getElementById('result').textContent = 'Envoi en cours...';
+      // --- SOFT LOCK VARIABLES ---
+      let isUpdating = false; // active during button operation
+      let isSoftLocked = false; // blocks UI rebuilds during refresh
+
+      const sendToDS = async (docId, labelId, exists) => {
+        const query = !exists
+          ? `mutation DossierAjouterLabel { dossierAjouterLabel(input: { dossierId: "${docId}", labelId: "${labelId}" }) { clientMutationId } }`
+          : `mutation DossierSupprimerLabel { dossierSupprimerLabel(input: { dossierId: "${docId}", labelId: "${labelId}" }) { clientMutationId } }`;
         try {
-          const res = await fetch('/create',{
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          } );
+          const res = await fetch("/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+          });
           const data = await res.json();
-          console.log("Response from external API:", data);
-
-          const text = await res.text();
-          try {
-            const j = JSON.parse(text);
-            document.getElementById('result').textContent = JSON.stringify(j, null, 2);
-          } catch (_) {
-            document.getElementById('result').textContent = text;
-          }
+          if (data?.errors?.length > 0) throw new Error(data.errors[0].message);
         } catch (e) {
-          document.getElementById('result').textContent = 'Échec de l\'envoi : ' + e;
+          console.error("Response error from external API:", e);
+          throw e;
         }
-      });
+      };
 
-      // Load the docId on startup
-      grist.ready({ requiredAccess: 'full' });
-      grist.onRecord((record) => {
-        console.log("Received record:", record);
-      //   if (record?.demarcheID) {
-      //       updateDemarcheID(record);
-      //   } else {
-      //       console.warn("Missing Demarche Id");
-      //   }
-      });
-      const getlabels = async()=>{
-
-        const tableData = await grist.docApi.fetchTable('LABELS');
-        console.log('labels are', tableData)
+      function showSpinner(container) {
+        container.innerHTML = '<div class="spinner"></div>';
       }
-      getlabels()
+      function hideSpinner(container) {
+        const spinner = container.querySelector(".spinner");
+        if (spinner) spinner.remove();
+      }
 
+      function normalize(str) {
+        return String(str)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/["'\[\]]/g, "")
+          .trim()
+          .toLowerCase();
+      }
+
+      function parseLabelNames(raw) {
+        if (!raw) return [];
+        return String(raw)
+          .replace(/["'\[\]]/g, "")
+          .trim()
+          .split(/\s*,\s*/)
+          .map(normalize)
+          .filter(Boolean);
+      }
+
+      function hasLabel(rawLabelNames, label) {
+        return parseLabelNames(rawLabelNames).includes(normalize(label));
+      }
+
+      async function updateDossierLabel(dossierId, label, action) {
+        try {
+          const dossiersTable = await grist.docApi.fetchTable(
+            dossiersTableName
+          );
+          const rowIds = dossiersTable.id;
+          const dossierIds = dossiersTable.dossier_id;
+          const labels = dossiersTable.label_names;
+
+          const index = dossierIds.findIndex((id) => id == dossierId);
+          if (index === -1) {
+            console.error("⚠️ Dossier non trouvé :", dossierId);
+            return;
+          }
+
+          const rowId = rowIds[index];
+          const currentValue = labels[index] || "";
+          const parsed = currentValue
+            .split(/\s*,\s*/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+          let newValue;
+          if (action === "add") {
+            if (!parsed.map(normalize).includes(normalize(label.name)))
+              parsed.push(label.name);
+            newValue = parsed.join(", ");
+          } else {
+            const labelNorm = normalize(label.name);
+            newValue = parsed
+              .filter((l) => normalize(l) !== labelNorm)
+              .join(", ");
+          }
+
+          await grist.docApi.applyUserActions([
+            [
+              "UpdateRecord",
+              dossiersTableName,
+              rowId,
+              { label_names: newValue },
+            ],
+          ]);
+          return newValue;
+        } catch (err) {
+          console.error("Erreur lors de la mise à jour du dossier :", err);
+          throw err;
+        }
+      }
+
+      async function loadLabels() {
+        try {
+          const tableData = await grist.docApi.fetchTable(labelTable);
+          const labels = tableData?.Label || tableData?.name || [];
+          const ids = tableData?.Id_DS || tableData?.id || [];
+          return Array.isArray(labels) && Array.isArray(ids)
+            ? labels.map((label, i) => ({ id: ids[i], name: labels[i] }))
+            : [];
+        } catch (err) {
+          console.error("Erreur lors du chargement des labels :", err);
+          return [];
+        }
+      }
+
+      async function displayLabels(selectedRecord) {
+        if (isSoftLocked) return; // ✅ prevent UI rebuild during update
+
+        const container = document.getElementById("labelContainer");
+        container.innerHTML = "";
+
+        if (!isUpdating) {
+          document.getElementById("error-message").style.display = "none";
+          document.getElementById("success-message").style.display = "none";
+        }
+
+        const labels = await loadLabels();
+        if (!labels.length) {
+          container.innerHTML =
+            "<p>Veuillez paramétrer les labels dans la table LABELS</p>";
+          return;
+        }
+
+        const dossierId = selectedRecord?.Dossier_Lie_Dossier_Id;
+        const rawLabelNames = selectedRecord?.Dossier_Lie_Label || "";
+        if (!dossierId) {
+          container.innerHTML = "<p>Aucun dossier lié à ce champ.</p>";
+          return;
+        }
+
+        labels.forEach((label) => {
+          const exists = hasLabel(rawLabelNames, label.name);
+          const btn = document.createElement("button");
+          btn.classList.add("fr-btn", "fr-btn--sm");
+          if (exists) {
+            btn.classList.add("fr-btn--secondary");
+            btn.textContent = `Supprimer ${label.name}`;
+            btn.dataset.action = "remove";
+          } else {
+            btn.classList.add("fr-btn--primary");
+            btn.textContent = `Ajouter ${label.name}`;
+            btn.dataset.action = "add";
+          }
+
+          btn.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            isUpdating = true;
+            isSoftLocked = true;
+
+            document.getElementById("error-message").style.display = "none";
+            document.getElementById("success-message").style.display = "none";
+
+            const allButtons = container.querySelectorAll("button");
+            allButtons.forEach((b) => (b.disabled = true));
+            showSpinner(document.getElementById("spinner-zone"));
+
+            try {
+              let existsNow = hasLabel(
+                selectedRecord.Dossier_Lie_Label,
+                label.name
+              );
+              await sendToDS(dossierId, label.id, existsNow);
+
+              const newValue = await updateDossierLabel(
+                dossierId,
+                label,
+                existsNow ? "remove" : "add"
+              );
+              selectedRecord.Dossier_Lie_Label = newValue;
+
+              existsNow = hasLabel(newValue, label.name);
+              if (existsNow) {
+                btn.classList.remove("fr-btn--primary");
+                btn.classList.add("fr-btn--secondary");
+                btn.textContent = `Supprimer ${label.name}`;
+                btn.dataset.action = "remove";
+              } else {
+                btn.classList.remove("fr-btn--secondary");
+                btn.classList.add("fr-btn--primary");
+                btn.textContent = `Ajouter ${label.name}`;
+                btn.dataset.action = "add";
+              }
+
+              const successBox = document.getElementById("success-message");
+              successBox.textContent = `✅ Le label ${label.name} a été ${
+                existsNow ? "ajouté" : "supprimé"
+              } avec succès dans démarches simplifiées`;
+              successBox.style.display = "block";
+            } catch (err) {
+              const errorBox = document.getElementById("error-message");
+              errorBox.textContent = "Erreur : " + err;
+              errorBox.style.display = "block";
+            } finally {
+              hideSpinner(document.getElementById("spinner-zone"));
+              allButtons.forEach((b) => (b.disabled = false));
+              isUpdating = false;
+              setTimeout(() => {
+                isSoftLocked = false;
+              }, 300); // ✅ give Grist refresh time
+            }
+          });
+
+          container.appendChild(btn);
+        });
+      }
+
+      let recordLock = false;
+      grist.onRecord(async (record) => {
+        if (recordLock) return;
+        recordLock = true;
+        const container = document.getElementById("labelContainer");
+
+        if (!record) {
+          container.innerHTML = "<p>Aucun champ sélectionné.</p>";
+          recordLock = false;
+          return;
+        }
+
+        document.getElementById("idDossier").innerText = record.dossier_number;
+
+        if (!isSoftLocked) {
+          document.getElementById("error-message").style.display = "none";
+          document.getElementById("success-message").style.display = "none";
+        }
+
+        await displayLabels(record);
+        recordLock = false;
+      });
     </script>
   </body>
 </html>

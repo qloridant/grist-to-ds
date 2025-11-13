@@ -11,6 +11,14 @@ from flask import Flask, render_template, request, abort, Response, redirect, js
 import os
 import requests
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DS_TOKEN = os.getenv("DS_TOKEN")
+DS_TARGET = os.getenv("DS_TARGET")
+
+
 
 app = Flask(__name__.split('.')[0])
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +31,11 @@ def index():
     """Serve a simple HTML page with a token field and JS that reads a document ID
     from a Grist table (via the `/grist/doc-id` endpoint) and issues a POST on submit.
     """
-    return render_template('index.html')
+    return render_template(
+        'index.html',
+        LABEL_TABLE=os.getenv("LABEL_TABLE"),
+        DOSSIERS_TABLE=os.getenv("DOSSIERS_TABLE")
+    )
 
 @app.route('/create', methods=['POST'])
 def create_post():
@@ -34,18 +46,11 @@ def create_post():
     set, it simply echoes back the received payload for debugging.
     """
 
-    print("Raw body:", request.data)   # bytes
-
     payload = request.get_json(force=True, silent=True)
-    print('payload',payload)
-    
-
 
     if not payload:
-        return jsonify({'error': 'Expected JSON body with token and docId.'}), 400
-    target = 'https://www.demarches-simplifiees.fr/api/v2/graphql'
-    # target = os.getenv('TARGET_POST_URL')
-    if not target:
+        return jsonify({'error': 'Expected JSON body with docId and query'}), 400
+    if not DS_TARGET:
         return jsonify({'received': payload})
     
      # Standard headers for JSON payload
@@ -53,21 +58,14 @@ def create_post():
         "Content-Type": "application/json"
     }
 
-    token = payload.get('token')  # safer: returns None if key missing
     query = payload.get('query')
 
-    print('token',token)
-    print('query',query)
     # Add Authorization header if token is provided
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    if DS_TOKEN:
+        headers["Authorization"] = f"Bearer {DS_TOKEN}"
 
     try:
-        print("trying request")
-        r = requests.post(target,  json={"query": query}, headers=headers, timeout=10)
-       
-        print("trying request",r)
-        # return Response(r.content, status=r.status_code, headers=dict(r.headers))
+        r = requests.post(DS_TARGET,  json={"query": query}, headers=headers, timeout=10)
         return Response(
             r.text,                     # decode content to string
             status=r.status_code,
