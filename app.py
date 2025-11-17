@@ -31,10 +31,24 @@ def index():
     """Serve a simple HTML page with a token field and JS that reads a document ID
     from a Grist table (via the `/grist/doc-id` endpoint) and issues a POST on submit.
     """
+    
+    DOSSIERS_TABLE = os.getenv("DOSSIERS_TABLE")
+    if not DOSSIERS_TABLE:
+        return "❌ DOSSIERS_TABLE manquante", 500
+    LABEL_TABLE = os.getenv("LABEL_TABLE")
+    if not LABEL_TABLE:
+        return "❌ LABEL_TABLE manquante", 500
+    DS_TOKEN = os.getenv("DS_TOKEN")
+    if not DS_TOKEN:
+        return "❌ DS_TOKEN manquant", 500
+    DS_TARGET = os.getenv("DS_TARGET")
+    if not DS_TARGET:
+        return "❌ DS_TARGET manquant", 500
+
     return render_template(
         'index.html',
-        LABEL_TABLE=os.getenv("LABEL_TABLE"),
-        DOSSIERS_TABLE=os.getenv("DOSSIERS_TABLE")
+        LABEL_TABLE=LABEL_TABLE,
+        DOSSIERS_TABLE=DOSSIERS_TABLE
     )
 
 @app.route('/create', methods=['POST'])
