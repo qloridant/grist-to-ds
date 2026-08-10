@@ -1,3 +1,27 @@
+<!--
+  PARTIE FRONT (HTML / JavaScript) de l'application "Grist to DS".
+
+  ATTENTION : ce fichier n'est PAS exécuté par le serveur Python (app.py).
+  Il est envoyé TEL QUEL par app.py (route "/", voir render_template) au
+  NAVIGATEUR de l'utilisateur, et c'est le navigateur qui exécute tout le
+  JavaScript ci-dessous. Ce fichier tourne donc à l'intérieur du widget
+  Grist (dans un <iframe>), pas sur le serveur.
+
+  Les deux seules choses que le serveur Python injecte dans cette page
+  avant de l'envoyer sont {{ LABEL_TABLE }} et {{ DOSSIERS_TABLE }}
+  (syntaxe du moteur de templates Jinja2), remplacées par les valeurs
+  des variables d'environnement du même nom. Voir le README.md.
+
+  Rôle de cette page :
+  - Elle utilise l'API JS de Grist (grist-plugin-api.js) pour savoir sur
+    quel "dossier" (ligne Grist) l'utilisateur est positionné, et pour
+    lire/écrire dans les tables Grist (labels disponibles, labels déjà
+    appliqués au dossier).
+  - Elle affiche un bouton par label possible (ajouter/supprimer).
+  - Quand on clique sur un bouton, elle appelle NOTRE serveur Python en
+    faisant fetch("/create") — jamais l'API de Démarches Simplifiées
+    directement, à cause des règles CORS (voir app.py et le README).
+-->
 <!DOCTYPE html>
 <html lang="fr">
   <head>
@@ -79,10 +103,20 @@
       "
     ></div>
 
+    <!-- SDK JavaScript officiel de Grist : permet à cette page (chargée
+         dans l'iframe du widget) de dialoguer avec le document Grist qui
+         l'héberge (lire des tables, écrire des lignes, savoir quelle
+         ligne est sélectionnée, etc.). -->
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script>
+      // Signale à Grist que le widget est prêt et demande un accès
+      // "full" (lecture + écriture) au document Grist.
       grist.ready({ requiredAccess: "full" });
 
+      // Ces deux valeurs viennent du serveur Python (app.py, route "/"),
+      // injectées via Jinja2 à partir des variables d'environnement
+      // LABEL_TABLE et DOSSIERS_TABLE. Ce sont les NOMS des tables Grist
+      // à utiliser (pas des identifiants Démarches Simplifiées).
       const labelTable = "{{ LABEL_TABLE }}";
       const dossiersTableName = "{{ DOSSIERS_TABLE }}";
 
@@ -93,6 +127,12 @@
       let isUpdating = false; // active during button operation
       let isSoftLocked = false; // blocks UI rebuilds during refresh
 
+      // Construit la requête GraphQL (ajout ou suppression de label) et
+      // l'envoie à NOTRE PROPRE serveur Python via fetch("/create") — un
+      // chemin relatif, donc pas de problème CORS ici, on reste sur le
+      // même domaine que la page. C'est app.py (route /create) qui se
+      // charge ensuite de relayer cette requête vers l'API GraphQL réelle
+      // de Démarches Simplifiées, côté serveur.
       const sendToDS = async (docId, labelId, exists) => {
         const query = !exists
           ? `mutation DossierAjouterLabel { dossierAjouterLabel(input: { dossierId: "${docId}", labelId: "${labelId}" }) { clientMutationId } }`
@@ -306,6 +346,10 @@
         });
       }
 
+      // grist.onRecord est l'événement du SDK Grist déclenché à chaque
+      // fois que l'utilisateur change de ligne sélectionnée (ou que la
+      // ligne courante est modifiée) dans le document Grist. C'est le
+      // point d'entrée principal de toute la logique d'affichage.
       let recordLock = false;
       grist.onRecord(async (record) => {
         if (recordLock) return;
