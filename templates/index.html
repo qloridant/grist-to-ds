@@ -1,3 +1,36 @@
+<<<<<<< Updated upstream
+=======
+<!--
+  PARTIE FRONT (HTML / JavaScript) de l'application "Grist to DS".
+
+  ATTENTION : ce fichier n'est PAS exécuté par le serveur Python (app.py).
+  Il est envoyé TEL QUEL par app.py (route "/", voir render_template) au
+  NAVIGATEUR de l'utilisateur, et c'est le navigateur qui exécute tout le
+  JavaScript ci-dessous. Ce fichier tourne donc à l'intérieur du widget
+  Grist (dans un <iframe>), pas sur le serveur.
+
+  La seule chose que le serveur Python injecte dans cette page avant de
+  l'envoyer est {{ LABEL_TABLE }} (syntaxe du moteur de templates
+  Jinja2), remplacée par la valeur de la variable d'environnement du
+  même nom. Voir le README.md.
+
+  La table des dossiers n'est plus injectée par le serveur : son nom
+  varie selon la démarche synchronisée dans le document Grist (motif
+  "Demarche_<id>_dossiers"), donc elle est détectée dynamiquement côté
+  navigateur via grist.docApi.listTables() (voir detectDossiersTable
+  ci-dessous).
+
+  Rôle de cette page :
+  - Elle utilise l'API JS de Grist (grist-plugin-api.js) pour savoir sur
+    quel "dossier" (ligne Grist) l'utilisateur est positionné, et pour
+    lire/écrire dans les tables Grist (labels disponibles, labels déjà
+    appliqués au dossier).
+  - Elle affiche un bouton par label possible (ajouter/supprimer).
+  - Quand on clique sur un bouton, elle appelle NOTRE serveur Python en
+    faisant fetch("/create") — jamais l'API de Démarches Simplifiées
+    directement, à cause des règles CORS (voir app.py et le README).
+-->
+>>>>>>> Stashed changes
 <!DOCTYPE html>
 <html lang="fr">
   <head>
@@ -83,11 +116,42 @@
     <script>
       grist.ready({ requiredAccess: "full" });
 
+<<<<<<< Updated upstream
+=======
+      // Cette valeur vient du serveur Python (app.py, route "/"),
+      // injectée via Jinja2 à partir de la variable d'environnement
+      // LABEL_TABLE. C'est le NOM de la table Grist à utiliser (pas un
+      // identifiant Démarches Simplifiées).
+>>>>>>> Stashed changes
       const labelTable = "{{ LABEL_TABLE }}";
-      const dossiersTableName = "{{ DOSSIERS_TABLE }}";
 
       console.log("Label table:", labelTable);
-      console.log("Dossier table:", dossiersTableName);
+
+      // La table des dossiers, elle, n'est PAS injectée par le serveur :
+      // son nom dépend de la démarche synchronisée dans CE document Grist
+      // (motif "Demarche_<id>_dossiers", ex. Demarche_128651_dossiers),
+      // donc il varie d'un document à l'autre. On la détecte dynamiquement
+      // en listant les tables du document et en cherchant celle qui
+      // correspond au motif.
+      let dossiersTableName = null;
+      const DOSSIERS_TABLE_REGEX = /^Demarche_\d+_dossiers$/i;
+
+      async function detectDossiersTable() {
+        const tables = await grist.docApi.listTables();
+        const matches = tables.filter((t) => DOSSIERS_TABLE_REGEX.test(t));
+        if (matches.length === 0) {
+          throw new Error(
+            "Aucune table de dossiers trouvée (motif attendu : Demarche_<id>_dossiers)"
+          );
+        }
+        if (matches.length > 1) {
+          console.warn(
+            "Plusieurs tables de dossiers trouvées, utilisation de la première :",
+            matches
+          );
+        }
+        return matches[0];
+      }
 
       // --- SOFT LOCK VARIABLES ---
       let isUpdating = false; // active during button operation
@@ -196,6 +260,11 @@
           const tableData = await grist.docApi.fetchTable(labelTable);
           const labels = tableData?.Label || tableData?.name || [];
           const ids = tableData?.Id_DS || tableData?.id || [];
+
+          console.log("tableData:",tableData);
+          console.log("labels:",labels);
+          console.log("ids:",ids);
+
           return Array.isArray(labels) && Array.isArray(ids)
             ? labels.map((label, i) => ({ id: ids[i], name: labels[i] }))
             : [];
@@ -307,6 +376,8 @@
       }
 
       let recordLock = false;
+      let dossiersTableReady = null; // Promise résolue une fois la table détectée
+
       grist.onRecord(async (record) => {
         if (recordLock) return;
         recordLock = true;
@@ -314,6 +385,23 @@
 
         if (!record) {
           container.innerHTML = "<p>Aucun champ sélectionné.</p>";
+          recordLock = false;
+          return;
+        }
+
+        // Détection paresseuse, une seule fois : on ne sait dialoguer avec
+        // le document (listTables) qu'une fois grist.ready() pris en compte.
+        if (!dossiersTableReady) {
+          dossiersTableReady = detectDossiersTable();
+        }
+        try {
+          dossiersTableName = await dossiersTableReady;
+        } catch (err) {
+          console.error("Erreur lors de la détection de la table des dossiers :", err);
+          const errorBox = document.getElementById("error-message");
+          errorBox.textContent = "Erreur : " + err.message;
+          errorBox.style.display = "block";
+          dossiersTableReady = null; // permet de réessayer au prochain record
           recordLock = false;
           return;
         }

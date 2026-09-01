@@ -15,10 +15,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+<<<<<<< Updated upstream
 DS_TOKEN = os.getenv("DS_TOKEN")
 DS_TARGET = os.getenv("DS_TARGET")
 
 
+=======
+# Variables d'environnement lues une seule fois, au démarrage du
+# processus. Un changement du fichier .env ou de la config Scalingo ne
+# sera pris en compte qu'après redémarrage du serveur.
+LABEL_TABLE = os.getenv("LABEL_TABLE", "").strip()
+DS_TOKEN = os.getenv("DS_TOKEN", "").strip()
+DS_TARGET = os.getenv("DS_TARGET", "").strip()
+>>>>>>> Stashed changes
 
 app = Flask(__name__.split('.')[0])
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +37,7 @@ LOG = logging.getLogger("app.py")
 
 @app.route('/')
 def index():
+<<<<<<< Updated upstream
     """Serve a simple HTML page with a token field and JS that reads a document ID
     from a Grist table (via the `/grist/doc-id` endpoint) and issues a POST on submit.
     """
@@ -36,19 +46,30 @@ def index():
     if not DOSSIERS_TABLE:
         return "❌ DOSSIERS_TABLE manquante", 500
     LABEL_TABLE = os.getenv("LABEL_TABLE")
+=======
+    # Sert le HTML/JS du widget (templates/index.html) après avoir
+    # vérifié que les variables d'environnement nécessaires sont bien là.
+    # Note : DOSSIERS_TABLE n'est plus lue ici, elle est détectée
+    # dynamiquement côté navigateur (voir templates/index.html), car son
+    # nom varie selon la démarche synchronisée dans chaque document Grist.
+>>>>>>> Stashed changes
     if not LABEL_TABLE:
         return "❌ LABEL_TABLE manquante", 500
-    DS_TOKEN = os.getenv("DS_TOKEN")
     if not DS_TOKEN:
         return "❌ DS_TOKEN manquant", 500
-    DS_TARGET = os.getenv("DS_TARGET")
     if not DS_TARGET:
         return "❌ DS_TARGET manquant", 500
 
+<<<<<<< Updated upstream
+=======
+    # render_template va chercher templates/index.html, remplacer le
+    # {{ LABEL_TABLE }} qu'il contient par la valeur ci-dessus (moteur de
+    # templates Jinja2 fourni par Flask), puis renvoyer le HTML final au
+    # navigateur.
+>>>>>>> Stashed changes
     return render_template(
         'index.html',
-        LABEL_TABLE=LABEL_TABLE,
-        DOSSIERS_TABLE=DOSSIERS_TABLE
+        LABEL_TABLE=LABEL_TABLE
     )
 
 @app.route('/create', methods=['POST'])
@@ -64,10 +85,18 @@ def create_post():
 
     if not payload:
         return jsonify({'error': 'Expected JSON body with docId and query'}), 400
+<<<<<<< Updated upstream
     if not DS_TARGET:
         return jsonify({'received': payload})
     
      # Standard headers for JSON payload
+=======
+
+    if not DS_TARGET:
+        return jsonify({'error': 'DS_TARGET manquant'}), 500
+
+    # Standard headers for JSON payload
+>>>>>>> Stashed changes
     headers = {
         "Content-Type": "application/json"
     }
