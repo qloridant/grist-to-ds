@@ -39,11 +39,11 @@ Cette application est un **petit serveur qui fait deux choses** :
                                                   API GraphQL Démarches Simplifiées
    ```
 
-   C'est aussi ce serveur qui garde le **jeton secret** (`DS_TOKEN`)
-   nécessaire pour s'authentifier auprès de DS : ce jeton ne doit
-   **jamais** se retrouver dans le code JavaScript envoyé au navigateur,
-   sinon n'importe quel visiteur pourrait l'y lire (avec l'inspecteur du
-   navigateur) et l'utiliser à votre place.
+   C'est aussi ce serveur qui reçoit le **jeton secret** (`DS_TOKEN`)
+   nécessaire pour s'authentifier auprès de DS et l'ajoute à la requête
+   sortante. Le jeton lui-même n'est **pas** stocké côté serveur : il est
+   lu par le widget dans le document Grist (table `Token_DN`, colonne
+   `Tocken_DN`) et transmis à `/create` à chaque appel — voir section 3.
 
 ---
 
@@ -60,9 +60,10 @@ s'exécutent à des endroits différents :
   production) — jamais dans le navigateur de l'utilisateur.
 - Définit les **routes** (les URLs auxquelles l'application répond) :
   - `GET /` → renvoie la page du widget (voir point b).
-  - `POST /create` → reçoit une requête du widget et la relaie
-    ("proxy") vers l'API GraphQL de Démarches Simplifiées, avec le
-    jeton secret `DS_TOKEN`, puis renvoie la réponse de DS telle quelle.
+  - `POST /create` → reçoit une requête du widget (query GraphQL +
+    jeton `DS_TOKEN` transmis par le widget) et la relaie ("proxy")
+    vers l'API GraphQL de Démarches Simplifiées, puis renvoie la
+    réponse de DS telle quelle.
 - C'est le seul fichier du projet où l'on peut lire/écrire des
   variables d'environnement (`os.getenv(...)`) et faire des appels HTTP
   sortants "de confiance" (avec le token secret).
@@ -108,19 +109,30 @@ la détecte donc dynamiquement au chargement, en listant les tables du
 document via `grist.docApi.listTables()` et en cherchant celle qui
 correspond au motif (fonction `detectDossiersTable`).
 
+**Cas particulier du jeton DS** : `DS_TOKEN` n'est plus non plus une
+variable d'environnement. Il est stocké dans une table du document
+Grist (table `Token_DN`, colonne `Tocken_DN`), lu par le widget via
+`grist.docApi.fetchTable("Token_DN")` (fonction `fetchDsToken`), puis
+envoyé au serveur dans le corps de la requête `POST /create` (champ
+`dsToken`). Ça permet de changer le jeton (rotation, révocation) sans
+redéployer l'application.
+
 ---
 
 ## 3. Les variables d'environnement (fichier `.env`)
 
-L'application a besoin de 4 informations de configuration, lues via
+L'application a besoin de 2 informations de configuration, lues via
 `os.getenv(...)` dans `app.py` :
 
 | Variable          | À quoi ça sert                                                                 |
 |-------------------|---------------------------------------------------------------------------------|
 | `LABEL_TABLE`     | Nom de la table Grist qui contient la liste des labels et leur identifiant DS   |
-| `DOSSIERS_TABLE`  | Nom de la table Grist qui contient les dossiers (synchronisés depuis DS)        |
-| `DS_TOKEN`        | Jeton secret d'authentification à l'API de Démarches Simplifiées                |
 | `DS_TARGET`       | URL de l'API GraphQL de Démarches Simplifiées (`.../api/v2/graphql`)            |
+
+Les deux autres informations dont l'appli a besoin (`DOSSIERS_TABLE` et
+`DS_TOKEN`) **ne sont pas** des variables d'environnement : elles sont
+lues dynamiquement dans le document Grist par `templates/index.html`
+(voir section 2, "cas particulier").
 
 ### `.env` vs `.env.EXEMPLE` — et pourquoi on ne copie jamais `.env`
 
@@ -136,10 +148,9 @@ même rôle :
 
 - **`.env`** : le fichier **réel**, utilisé uniquement quand on lance
   l'application **en local sur sa machine**. Il contient les **vraies
-  valeurs**, y compris le `DS_TOKEN` — un vrai secret qui donne accès à
-  l'API de Démarches Simplifiées. C'est `python-dotenv`
-  (`load_dotenv()` dans `app.py`) qui lit ce fichier au démarrage et
-  charge son contenu comme variables d'environnement.
+  valeurs**. C'est `python-dotenv` (`load_dotenv()` dans `app.py`) qui
+  lit ce fichier au démarrage et charge son contenu comme variables
+  d'environnement.
 
 **Ce fichier `.env` n'est jamais envoyé sur git**, et c'est volontaire :
 voir le fichier [`.gitignore`](.gitignore), qui contient la ligne
@@ -147,13 +158,10 @@ voir le fichier [`.gitignore`](.gitignore), qui contient la ligne
 jamais dans `git status`, ne peut pas être ajouté par erreur avec
 `git add`, et n'a jamais été présent dans l'historique du dépôt.
 
-**Pourquoi c'est important** :
-- Un dépôt git (surtout sur GitHub) peut être vu par d'autres personnes,
-  ou fuiter. Si `DS_TOKEN` s'y trouvait, n'importe qui pourrait l'utiliser
-  pour agir sur les dossiers de Démarches Simplifiées à votre place.
-- Chaque personne (ou chaque environnement : local / production) peut
-  avoir des valeurs différentes dans son propre `.env`, sans jamais les
-  partager par erreur.
+**Pourquoi c'est important** : chaque personne (ou chaque
+environnement : local / production) peut avoir des valeurs différentes
+dans son propre `.env`, sans jamais les partager par erreur — utile par
+exemple si `LABEL_TABLE` diffère d'un document Grist à l'autre.
 
 **Conséquence pratique** : quand vous récupérez ce projet pour la
 première fois (`git clone`), il n'y a **pas de fichier `.env`** — c'est
@@ -163,14 +171,13 @@ normal, il faut le créer soi-même :
 cp .env.EXEMPLE .env
 ```
 
-puis remplacer les valeurs d'exemple par les vraies (notamment le vrai
-`DS_TOKEN`, à récupérer auprès de la personne qui gère l'accès à
-l'API Démarches Simplifiées, ou dans le gestionnaire de secrets de
-l'équipe).
+puis remplacer les valeurs d'exemple par les vraies. Le jeton `DS_TOKEN`
+n'a lui rien à voir avec ce fichier : voir section 2, "cas particulier
+du jeton DS", il se configure directement dans le document Grist.
 
 En **production sur Scalingo**, il n'y a pas non plus de fichier `.env`
-sur le serveur : les mêmes 4 variables sont définies directement dans
-l'interface de Scalingo (voir section 5 ci-dessous). Le code
+sur le serveur : les 2 variables ci-dessus sont définies directement
+dans l'interface de Scalingo (voir section 5 ci-dessous). Le code
 (`os.getenv(...)`) fonctionne à l'identique dans les deux cas, seule la
 manière de fournir les variables change.
 
@@ -267,15 +274,16 @@ sans avoir à repousser de code.
 
 Comme expliqué en section 3, le fichier `.env` n'est **jamais** envoyé
 sur GitHub ni sur Scalingo. Il faut donc, **une fois par application
-Scalingo** (pas à chaque déploiement), configurer manuellement les 3
+Scalingo** (pas à chaque déploiement), configurer manuellement les 2
 variables listées en section 3 dans l'interface Scalingo : onglet
 **"Environment"** (ou "Variables d'environnement") de l'application,
 en utilisant les mêmes noms de clés que dans `.env.EXEMPLE`
-(`LABEL_TABLE`, `DS_TOKEN`, `DS_TARGET`).
+(`LABEL_TABLE`, `DS_TARGET`). Le jeton `DS_TOKEN`, lui, se configure
+dans le document Grist (table `Token_DN`), pas sur Scalingo.
 
 Si une de ces variables est absente, l'application affichera une erreur
-explicite (ex : `❌ DS_TOKEN manquant`) au lieu de planter silencieusement
-— voir la fonction `index()` dans `app.py`.
+explicite (ex : `❌ LABEL_TABLE manquante`) au lieu de planter
+silencieusement — voir la fonction `index()` dans `app.py`.
 
 ---
 

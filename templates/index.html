@@ -147,6 +147,24 @@
         return matches[0];
       }
 
+      // Le jeton DS n'est plus une variable d'environnement du serveur :
+      // il est stocké dans le document Grist (table Token_DN, colonne
+      // Tocken_DN) pour pouvoir être changé sans redéployer l'appli.
+      // Le widget le lit ici et le transmet à /create à chaque appel.
+      let dsToken = null;
+      const TOKEN_TABLE = "Token_DN";
+
+      async function fetchDsToken() {
+        const tableData = await grist.docApi.fetchTable(TOKEN_TABLE);
+        const tokens = tableData?.Tocken_DN || [];
+        if (!tokens[0]) {
+          throw new Error(
+            "Veuillez de saisir le token DN ou contacter l'administrateur à l'en saisir"
+          );
+        }
+        return tokens[0];
+      }
+
       // --- SOFT LOCK VARIABLES ---
       let isUpdating = false; // active during button operation
       let isSoftLocked = false; // blocks UI rebuilds during refresh
@@ -159,7 +177,7 @@
           const res = await fetch("/create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query }),
+            body: JSON.stringify({ query, dsToken }),
           });
           const data = await res.json();
           if (data?.errors?.length > 0) throw new Error(data.errors[0].message);
@@ -371,6 +389,7 @@
 
       let recordLock = false;
       let dossiersTableReady = null; // Promise résolue une fois la table détectée
+      let dsTokenReady = null; // Promise résolue une fois le token DS lu
 
       grist.onRecord(async (record) => {
         if (recordLock) return;
@@ -383,19 +402,27 @@
           return;
         }
 
-        // Détection paresseuse, une seule fois : on ne sait dialoguer avec
-        // le document (listTables) qu'une fois grist.ready() pris en compte.
+        // Détection/lecture paresseuse, une seule fois chacune : on ne
+        // sait dialoguer avec le document (listTables/fetchTable) qu'une
+        // fois grist.ready() pris en compte.
         if (!dossiersTableReady) {
           dossiersTableReady = detectDossiersTable();
         }
+        if (!dsTokenReady) {
+          dsTokenReady = fetchDsToken();
+        }
         try {
-          dossiersTableName = await dossiersTableReady;
+          [dossiersTableName, dsToken] = await Promise.all([
+            dossiersTableReady,
+            dsTokenReady,
+          ]);
         } catch (err) {
-          console.error("Erreur lors de la détection de la table des dossiers :", err);
+          console.error("Erreur lors de l'initialisation :", err);
           const errorBox = document.getElementById("error-message");
           errorBox.textContent = "Erreur : " + err.message;
           errorBox.style.display = "block";
           dossiersTableReady = null; // permet de réessayer au prochain record
+          dsTokenReady = null;
           recordLock = false;
           return;
         }

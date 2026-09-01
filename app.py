@@ -22,8 +22,10 @@ load_dotenv()
 # Variables d'environnement lues une seule fois, au démarrage du
 # processus. Un changement du fichier .env ou de la config Scalingo ne
 # sera pris en compte qu'après redémarrage du serveur.
+# Note : DS_TOKEN n'est plus lu ici. Il est stocké dans le document
+# Grist (table Token_DN, colonne Tocken_DN) et transmis par le widget
+# à chaque appel de /create (voir templates/index.html).
 LABEL_TABLE = os.getenv("LABEL_TABLE", "").strip()
-DS_TOKEN = os.getenv("DS_TOKEN", "").strip()
 DS_TARGET = os.getenv("DS_TARGET", "").strip()
 
 # Création de l'application Flask (le serveur web en lui-même).
@@ -44,8 +46,6 @@ def index():
     # nom varie selon la démarche synchronisée dans chaque document Grist.
     if not LABEL_TABLE:
         return "❌ LABEL_TABLE manquante", 500
-    if not DS_TOKEN:
-        return "❌ DS_TOKEN manquant", 500
     if not DS_TARGET:
         return "❌ DS_TARGET manquant", 500
 
@@ -69,6 +69,11 @@ def create_post():
 
     if not DS_TARGET:
         return jsonify({'error': 'DS_TARGET manquant'}), 500
+
+    # DS_TOKEN vient du document Grist (table Token_DN, colonne
+    # Tocken_DN) : le widget le lit via grist.docApi et le transmet ici,
+    # il n'est plus configuré côté serveur.
+    DS_TOKEN = (payload.get('dsToken') or '').strip()
 
     # Standard headers for JSON payload
     headers = {
