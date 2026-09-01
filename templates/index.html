@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 <!--
   PARTIE FRONT (HTML / JavaScript) de l'application "Grist to DS".
 
@@ -30,7 +28,6 @@
     faisant fetch("/create") — jamais l'API de Démarches Simplifiées
     directement, à cause des règles CORS (voir app.py et le README).
 -->
->>>>>>> Stashed changes
 <!DOCTYPE html>
 <html lang="fr">
   <head>
@@ -116,13 +113,10 @@
     <script>
       grist.ready({ requiredAccess: "full" });
 
-<<<<<<< Updated upstream
-=======
       // Cette valeur vient du serveur Python (app.py, route "/"),
       // injectée via Jinja2 à partir de la variable d'environnement
       // LABEL_TABLE. C'est le NOM de la table Grist à utiliser (pas un
       // identifiant Démarches Simplifiées).
->>>>>>> Stashed changes
       const labelTable = "{{ LABEL_TABLE }}";
 
       console.log("Label table:", labelTable);

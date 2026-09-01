@@ -1,8 +1,5 @@
 # Grist To DS
 
-<<<<<<< Updated upstream
-Permet d'assigner des labels à des dossiers de Démarche Simplifiée depuis Grist
-=======
 Widget Grist qui permet d'appliquer/retirer des **labels** sur les dossiers
 de **Démarches Simplifiées (DS)**, directement depuis un tableau Grist.
 
@@ -305,4 +302,3 @@ explicite (ex : `❌ DS_TOKEN manquant`) au lieu de planter silencieusement
                      │   API GraphQL Démarches Simplifiées       │
                      └─────────────────────────────────────────┘
 ```
->>>>>>> Stashed changes
