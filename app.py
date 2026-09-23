@@ -23,8 +23,8 @@ load_dotenv()
 # processus. Un changement du fichier .env ou de la config Scalingo ne
 # sera pris en compte qu'après redémarrage du serveur.
 # Note : DS_TOKEN n'est plus lu ici. Il est stocké dans le document
-# Grist (table Token_DN, colonne Tocken_DN) et transmis par le widget
-# à chaque appel de /create (voir templates/index.html).
+# Grist (table Configuration, colonne Tocken_DN) et transmis par le
+# widget à chaque appel de /create (voir templates/index.html).
 LABEL_TABLE = os.getenv("LABEL_TABLE", "").strip()
 DS_TARGET = os.getenv("DS_TARGET", "").strip()
 
@@ -70,7 +70,7 @@ def create_post():
     if not DS_TARGET:
         return jsonify({'error': 'DS_TARGET manquant'}), 500
 
-    # DS_TOKEN vient du document Grist (table Token_DN, colonne
+    # DS_TOKEN vient du document Grist (table Configuration, colonne
     # Tocken_DN) : le widget le lit via grist.docApi et le transmet ici,
     # il n'est plus configuré côté serveur.
     DS_TOKEN = (payload.get('dsToken') or '').strip()

@@ -148,11 +148,12 @@
       }
 
       // Le jeton DS n'est plus une variable d'environnement du serveur :
-      // il est stocké dans le document Grist (table Token_DN, colonne
-      // Tocken_DN) pour pouvoir être changé sans redéployer l'appli.
-      // Le widget le lit ici et le transmet à /create à chaque appel.
+      // il est stocké dans le document Grist (table Configuration,
+      // colonne Tocken_DN) pour pouvoir être changé sans redéployer
+      // l'appli. Le widget le lit ici et le transmet à /create à chaque
+      // appel.
       let dsToken = null;
-      const TOKEN_TABLE = "Token_DN";
+      const TOKEN_TABLE = "Configuration";
 
       async function fetchDsToken() {
         const tableData = await grist.docApi.fetchTable(TOKEN_TABLE);

@@ -42,7 +42,7 @@ Cette application est un **petit serveur qui fait deux choses** :
    C'est aussi ce serveur qui reçoit le **jeton secret** (`DS_TOKEN`)
    nécessaire pour s'authentifier auprès de DS et l'ajoute à la requête
    sortante. Le jeton lui-même n'est **pas** stocké côté serveur : il est
-   lu par le widget dans le document Grist (table `Token_DN`, colonne
+   lu par le widget dans le document Grist (table `Configuration`, colonne
    `Tocken_DN`) et transmis à `/create` à chaque appel — voir section 3.
 
 ---
@@ -111,8 +111,8 @@ correspond au motif (fonction `detectDossiersTable`).
 
 **Cas particulier du jeton DS** : `DS_TOKEN` n'est plus non plus une
 variable d'environnement. Il est stocké dans une table du document
-Grist (table `Token_DN`, colonne `Tocken_DN`), lu par le widget via
-`grist.docApi.fetchTable("Token_DN")` (fonction `fetchDsToken`), puis
+Grist (table `Configuration`, colonne `Tocken_DN`), lu par le widget via
+`grist.docApi.fetchTable("Configuration")` (fonction `fetchDsToken`), puis
 envoyé au serveur dans le corps de la requête `POST /create` (champ
 `dsToken`). Ça permet de changer le jeton (rotation, révocation) sans
 redéployer l'application.
@@ -279,7 +279,7 @@ variables listées en section 3 dans l'interface Scalingo : onglet
 **"Environment"** (ou "Variables d'environnement") de l'application,
 en utilisant les mêmes noms de clés que dans `.env.EXEMPLE`
 (`LABEL_TABLE`, `DS_TARGET`). Le jeton `DS_TOKEN`, lui, se configure
-dans le document Grist (table `Token_DN`), pas sur Scalingo.
+dans le document Grist (table `Configuration`), pas sur Scalingo.
 
 Si une de ces variables est absente, l'application affichera une erreur
 explicite (ex : `❌ LABEL_TABLE manquante`) au lieu de planter
